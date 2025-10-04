@@ -19,10 +19,11 @@
    → Each requirement must be testable
    → Mark ambiguous requirements
 6. Identify Key Entities (if data involved)
-7. Run Review Checklist
+7. Capture constitution-aligned quality guardrails (UX, testing expectations, performance budgets)
+8. Run Review Checklist
    → If any [NEEDS CLARIFICATION]: WARN "Spec has uncertainties"
    → If implementation details found: ERROR "Remove tech details"
-8. Return: SUCCESS (spec ready for planning)
+9. Return: SUCCESS (spec ready for planning)
 ```
 
 ---
@@ -31,6 +32,7 @@
 - ✅ Focus on WHAT users need and WHY
 - ❌ Avoid HOW to implement (no tech stack, APIs, code structure)
 - 👥 Written for business stakeholders, not developers
+- 🧭 Call out UX, testing, and performance expectations that downstream plans must honor
 
 ### Section Requirements
 - **Mandatory sections**: Must be completed for every feature
@@ -82,6 +84,17 @@ When creating this spec from a user prompt:
 - **[Entity 1]**: [What it represents, key attributes without implementation]
 - **[Entity 2]**: [What it represents, relationships to other entities]
 
+## Experience & Quality Guardrails *(mandatory)*
+
+### Menu Interaction Consistency
+[Describe the desired conversational flow, tone, accessibility accommodations, and localization needs for the menu experience.]
+
+### Performance Targets
+[State latency ceilings (e.g., ≤50ms p95 for handlers), throughput expectations, and how they will be measured.]
+
+### Testing Signals
+[List the critical regression tests, integration scenarios, and coverage expectations required to validate the feature.]
+
 ---
 
 ## Review & Acceptance Checklist
@@ -92,6 +105,7 @@ When creating this spec from a user prompt:
 - [ ] Focused on user value and business needs
 - [ ] Written for non-technical stakeholders
 - [ ] All mandatory sections completed
+- [ ] Experience & Quality Guardrails documented with measurable criteria
 
 ### Requirement Completeness
 - [ ] No [NEEDS CLARIFICATION] markers remain
@@ -99,6 +113,7 @@ When creating this spec from a user prompt:
 - [ ] Success criteria are measurable
 - [ ] Scope is clearly bounded
 - [ ] Dependencies and assumptions identified
+- [ ] Constitution principles are addressed (UX, testing, performance expectations)
 
 ---
 

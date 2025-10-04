@@ -13,22 +13,23 @@
    → contracts/: Each file → contract test task
    → research.md: Extract decisions → setup tasks
 3. Generate tasks by category:
-   → Setup: project init, dependencies, linting
-   → Tests: contract tests, integration tests
-   → Core: models, services, CLI commands
-   → Integration: DB, middleware, logging
-   → Polish: unit tests, performance, docs
+   → Setup: Deno project plumbing, linting, formatting
+   → Tests: unit + integration coverings per constitution
+   → Core: plugin modules, helpers, type exports
+   → Experience: documentation, UX transcripts, examples
+   → Performance: benchmarks, profiling, regression monitors
+   → Polish: cleanup, release notes
 4. Apply task rules:
    → Different files = mark [P] for parallel
    → Same file = sequential (no [P])
-   → Tests before implementation (TDD)
+   → Tests before implementation (TDD) and include performance probes early
 5. Number tasks sequentially (T001, T002...)
 6. Generate dependency graph
 7. Create parallel execution examples
 8. Validate task completeness:
-   → All contracts have tests?
-   → All entities have models?
-   → All endpoints implemented?
+   → Tests exist for every contract + UX flow?
+   → Performance budgets instrumented?
+   → Docs/examples refreshed?
 9. Return: SUCCESS (tasks ready for execution)
 ```
 
@@ -37,65 +38,62 @@
 - Include exact file paths in descriptions
 
 ## Path Conventions
-- **Single project**: `src/`, `tests/` at repository root
-- **Web app**: `backend/src/`, `frontend/src/`
-- **Mobile**: `api/src/`, `ios/src/` or `android/src/`
+- **Plugin library (default)**: `src/`, `tests/`, `examples/` at repository root
+- Use `.ts`/`.mts` modules compatible with Deno; configure `deno.json` for tasks (`fmt`, `lint`, `test`)
 - Paths shown below assume single project - adjust based on plan.md structure
 
 ## Phase 3.1: Setup
-- [ ] T001 Create project structure per implementation plan
-- [ ] T002 Initialize [language] project with [framework] dependencies
-- [ ] T003 [P] Configure linting and formatting tools
+- [ ] T001 Define project structure per implementation plan (src/, tests/, examples/)
+- [ ] T002 Configure `deno.json` tasks for fmt, lint, test, coverage, and benchmark commands
+- [ ] T003 [P] Add baseline README usage example referencing current feature
 
 ## Phase 3.2: Tests First (TDD) ⚠️ MUST COMPLETE BEFORE 3.3
 **CRITICAL: These tests MUST be written and MUST FAIL before ANY implementation**
-- [ ] T004 [P] Contract test POST /api/users in tests/contract/test_users_post.py
-- [ ] T005 [P] Contract test GET /api/users/{id} in tests/contract/test_users_get.py
-- [ ] T006 [P] Integration test user registration in tests/integration/test_registration.py
-- [ ] T007 [P] Integration test auth flow in tests/integration/test_auth.py
+- [ ] T004 [P] Unit specs for new menu helpers in `tests/unit/[feature]_menu_test.ts`
+- [ ] T005 [P] Integration scenario simulating Telegram updates in `tests/integration/[feature]_flow_test.ts`
+- [ ] T006 [P] Snapshot/regression test for menu rendering in `tests/regression/[feature]_menu_snapshot.ts`
+- [ ] T007 Performance harness stub measuring handler latency in `tests/perf/[feature]_handler_bench.ts`
 
 ## Phase 3.3: Core Implementation (ONLY after tests are failing)
-- [ ] T008 [P] User model in src/models/user.py
-- [ ] T009 [P] UserService CRUD in src/services/user_service.py
-- [ ] T010 [P] CLI --create-user in src/cli/user_commands.py
-- [ ] T011 POST /api/users endpoint
-- [ ] T012 GET /api/users/{id} endpoint
-- [ ] T013 Input validation
-- [ ] T014 Error handling and logging
+- [ ] T008 [P] Implement menu helpers in `src/[feature]/mod.ts` with typed exports
+- [ ] T009 Wire helper into plugin entry point `src/mod.ts` and update re-exports
+- [ ] T010 Add configuration guards + input validation for menu options
+- [ ] T011 Implement logging & error-handling utilities aligned with grammy context
+- [ ] T012 Update `examples/[feature].ts` to demonstrate the new flow
 
-## Phase 3.4: Integration
-- [ ] T015 Connect UserService to DB
-- [ ] T016 Auth middleware
-- [ ] T017 Request/response logging
-- [ ] T018 CORS and security headers
+## Phase 3.4: Experience & Performance
+- [ ] T013 Validate localization + copy in `docs/ux-guidelines.md` (or update plan-specified file)
+- [ ] T014 Capture menu interaction transcript or screenshots for reviewers
+- [ ] T015 Run latency benchmarks (`deno bench` or custom harness) and document results vs 50ms p95 budget
+- [ ] T016 Add instrumentation or tracing hooks if budget risk detected
 
 ## Phase 3.5: Polish
-- [ ] T019 [P] Unit tests for validation in tests/unit/test_validation.py
-- [ ] T020 Performance tests (<200ms)
-- [ ] T021 [P] Update docs/api.md
-- [ ] T022 Remove duplication
-- [ ] T023 Run manual-testing.md
+- [ ] T017 [P] Add regression unit tests for edge cases discovered during review
+- [ ] T018 Update changelog/release notes with migration + UX callouts
+- [ ] T019 [P] Run `deno fmt`, `deno lint`, `deno task test --coverage` and attach artifacts
+- [ ] T020 Clean up duplication and ensure tree-shakeable exports
+- [ ] T021 Final UX walkthrough confirming menu consistency post-implementation
 
 ## Dependencies
-- Tests (T004-T007) before implementation (T008-T014)
-- T008 blocks T009, T015
-- T016 blocks T018
-- Implementation before polish (T019-T023)
+- Tests/benchmarks (T004-T007) before implementation (T008-T012)
+- T008 blocks T009 and T010
+- T015 depends on passing performance harness from T007
+- Implementation before polish (T017-T021)
 
 ## Parallel Example
 ```
 # Launch T004-T007 together:
-Task: "Contract test POST /api/users in tests/contract/test_users_post.py"
-Task: "Contract test GET /api/users/{id} in tests/contract/test_users_get.py"
-Task: "Integration test registration in tests/integration/test_registration.py"
-Task: "Integration test auth in tests/integration/test_auth.py"
+Task: "Unit specs for new menu helpers in tests/unit/[feature]_menu_test.ts"
+Task: "Integration scenario simulating Telegram updates in tests/integration/[feature]_flow_test.ts"
+Task: "Snapshot/regression test for menu rendering in tests/regression/[feature]_menu_snapshot.ts"
+Task: "Performance harness stub measuring handler latency in tests/perf/[feature]_handler_bench.ts"
 ```
 
 ## Notes
 - [P] tasks = different files, no dependencies
 - Verify tests fail before implementing
-- Commit after each task
-- Avoid: vague tasks, same file conflicts
+- Commit after each task with coverage + benchmark artifacts attached
+- Avoid: vague tasks, same file conflicts, skipping performance validation
 
 ## Task Generation Rules
 *Applied during main() execution*
@@ -105,12 +103,12 @@ Task: "Integration test auth in tests/integration/test_auth.py"
    - Each endpoint → implementation task
    
 2. **From Data Model**:
-   - Each entity → model creation task [P]
-   - Relationships → service layer tasks
-   
+   - Each entity → model/service creation task [P]
+   - Relationships → helper wiring tasks
+
 3. **From User Stories**:
    - Each story → integration test [P]
-   - Quickstart scenarios → validation tasks
+   - Quickstart scenarios → UX transcript + validation tasks
 
 4. **Ordering**:
    - Setup → Tests → Models → Services → Endpoints → Polish
@@ -119,9 +117,10 @@ Task: "Integration test auth in tests/integration/test_auth.py"
 ## Validation Checklist
 *GATE: Checked by main() before returning*
 
-- [ ] All contracts have corresponding tests
-- [ ] All entities have model tasks
-- [ ] All tests come before implementation
+- [ ] All contracts & UX flows have corresponding tests/benchmarks
+- [ ] All entities have model/service tasks
+- [ ] Tests and performance probes come before implementation
 - [ ] Parallel tasks truly independent
 - [ ] Each task specifies exact file path
 - [ ] No task modifies same file as another [P] task
+- [ ] Constitution principles (code quality, tests, UX, performance) traced to explicit tasks

@@ -11,7 +11,7 @@
 2. Fill Technical Context (scan for NEEDS CLARIFICATION)
    → Detect Project Type from file system structure or context (web=frontend+backend, mobile=app+api)
    → Set Structure Decision based on project type
-3. Fill the Constitution Check section based on the content of the constitution document.
+3. Fill the Constitution Check section using the latest constitution (v1.0.0).
 4. Evaluate Constitution Check section below
    → If violations exist: Document in Complexity Tracking
    → If no justification possible: ERROR "Simplify approach first"
@@ -47,7 +47,10 @@
 ## Constitution Check
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+- [ ] Code Quality Without Compromise — Document linting, formatting, and API stability strategy.
+- [ ] Tests Define Behavior — List failing tests to write first and coverage expectations.
+- [ ] Consistent Bot Interaction Experience — Capture menu flows, copy standards, and accessibility notes.
+- [ ] Performance-Centered Delivery — Set measurable latency budgets and validation steps.
 
 ## Project Structure
 
@@ -216,4 +219,4 @@ directories captured above]
 - [ ] Complexity deviations documented
 
 ---
-*Based on Constitution v2.1.1 - See `/memory/constitution.md`*
+*Based on Constitution v1.0.0 - See `/memory/constitution.md`*

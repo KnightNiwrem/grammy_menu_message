@@ -86,6 +86,8 @@ As a Telegram bot developer, I can register reusable menu templates, generate a 
 - TTL expiry during Back navigation → answer the callback to inform the user that history expired, remove the Back button from the keyboard, and persist the pruned history.
 - TTL expiry of the current entry → remove the entire inline keyboard and update message text to state that the menu has expired.
 
+- Unknown or expired UUID mapping in `callback_data` → answer the callback to inform the user the action is invalid/expired, do not execute any action, and optionally prune related stale mapping entries.
+
 ## Requirements (mandatory)
 
 ### Functional Requirements
@@ -116,6 +118,11 @@ As a Telegram bot developer, I can register reusable menu templates, generate a 
 - FR-023: If the currently viewed entry is expired, the system MUST remove the entire inline keyboard, update the message text to indicate the menu has expired, and prevent further interactions on that message.
 - FR-024: Referencing an unknown/unregistered template id for navigation MUST throw and MUST NOT modify history/state.
 
+- FR-025: Buttons MUST use opaque UUID values in `callback_data`. The library MUST maintain a server-side mapping from UUID → action payload (e.g., target template id, arguments, paging command) and MUST NOT embed sensitive or structured payloads directly in `callback_data`.
+- FR-026: On incoming interactions, the library MUST resolve the UUID to its stored payload. The UUID→payload mapping MUST have the exact same lifetime as the corresponding history entry and MUST be pruned/expired together. If the UUID is unknown or expired, the action MUST NOT execute; the user MUST be informed via answering the callback (e.g., “This action is no longer available”), and the plugin MUST leave state unchanged. Cleanup MUST be deterministic and observable via hooks/events.
+
+- FR-027: Duplicate taps on the same button after successful handling MUST be idempotently ignored without answering the callback again (silent no-op) to avoid chat spam and race conditions.
+
 Ambiguities to clarify:
 Resolved defaults and out-of-scope policies:
 - FR-D01: Default segmentation key is "global" when the developer does not provide a key.
@@ -134,6 +141,8 @@ Resolved defaults and out-of-scope policies:
 - Segmentation Key: A developer-provided function or value used to isolate histories and state (e.g., per chat, per user, or custom domain key).
 - Pagination Strategy: A pluggable definition (data and rules) that determines how paginated content is computed, rendered, and navigated.
 
+- Callback Mapping: An opaque UUID key associated to an action payload required to process a button press; used to resolve interactions without exposing payloads in `callback_data`. Its lifetime is identical to its corresponding history entry and they are pruned/expired together.
+
 ---
 
 ## Clarifications
@@ -141,6 +150,13 @@ Resolved defaults and out-of-scope policies:
 ### Session 2025-10-06
 - Q: Which Telegram API methods should the transformer intercept to replace message text and inline keyboard when a menu object is passed? → A: C (All methods that accept reply_markup.inline_keyboard)
 - Q: Which storage consistency guarantees do you expect per segmentation key during concurrent actions? → A: C (Serializable per-key history)
+
+### Session 2025-10-08
+- Q: What is the encoding approach for button callback_data and how are action payloads associated? → A: Use opaque UUIDs in callback_data; the plugin stores a UUID→payload mapping and resolves it on interaction.
+
+- Q: What is the retention policy for UUID→payload mappings relative to menu history? → A: Same lifetime as corresponding history entry; expire/prune together.
+
+- Q: After a button action is successfully processed, how should duplicate taps on the same button be handled? → A: B (Silently ignore; no callback answer)
 
 
 ## Review & Acceptance Checklist

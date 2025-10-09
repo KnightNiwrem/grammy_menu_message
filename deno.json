@@ -1,0 +1,23 @@
+{
+  "$schema": "https://deno.land/x/deno/cli/schemas/config-file.v1.json",
+  "tasks": {
+    "fmt": "deno fmt",
+    "lint": "deno lint",
+    "test": "deno test"
+  },
+  "fmt": {
+    "include": ["src/", "deps.deno.ts", "deps.node.ts", "deno.json"]
+  },
+  "lint": {
+    "include": ["src/"],
+    "rules": {
+      "tags": ["recommended"]
+    }
+  },
+  "test": {
+    "include": ["src/tests/"]
+  },
+  "compilerOptions": {
+    "lib": ["deno.ns", "dom"]
+  }
+}

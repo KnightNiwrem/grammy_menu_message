@@ -1,6 +1,7 @@
 # Copilot Instructions for copilot-deno Project
 
-This document provides guidelines for GitHub Copilot when suggesting code for this project.
+This document provides guidelines for GitHub Copilot when suggesting code for
+this project.
 
 ## Project Architecture
 
@@ -67,8 +68,11 @@ If developing a Telegram bot:
 
 - Use `grammy` and related plugins imported from `lib.deno.dev`
 - The lib.deno.dev import URL structure mirrors that of deno.land/x
-- For example, if the deno.land import URL is https://deno.land/x/grammy@v1.36.3/mod.ts, then the lib.deno.dev version would be https://lib.deno.dev/x/grammy@v1/mod.ts
-- Note that lib.deno.dev respects semantic versioning, so using `@v1` will automatically use the latest 1.x.x version
+- For example, if the deno.land import URL is
+  https://deno.land/x/grammy@v1.36.3/mod.ts, then the lib.deno.dev version would
+  be https://lib.deno.dev/x/grammy@v1/mod.ts
+- Note that lib.deno.dev respects semantic versioning, so using `@v1` will
+  automatically use the latest 1.x.x version
 - **Important**: Do NOT use grammy sessions
 
 Example import:
@@ -95,8 +99,10 @@ import * as assert from "jsr:@std/assert";
 When developing features for this project:
 
 - Features should be written in a way that they can be unit tested
-- Prefer using testing functions such as `describe` and `it` from "jsr:@std/testing/bdd" over "Deno.test"
-- This provides better test organization and readability with behavior-driven development patterns
+- Prefer using testing functions such as `describe` and `it` from
+  "jsr:@std/testing/bdd" over "Deno.test"
+- This provides better test organization and readability with behavior-driven
+  development patterns
 
 Example test structure:
 
@@ -119,11 +125,15 @@ describe("Feature Name", () => {
 
 ## Sandbox Environment Certificate Handling
 
-When running in GitHub Copilot's sandbox environment, you may encounter certificate errors due to MITM (Man-in-the-Middle) proxy certificates. To handle this when running Deno commands that need to pull imports:
+When running in GitHub Copilot's sandbox environment, you may encounter
+certificate errors due to MITM (Man-in-the-Middle) proxy certificates. To handle
+this when running Deno commands that need to pull imports:
 
 - Use the `--unsafely-ignore-certificate-errors` flag with Deno commands
-- This flag should only be used in sandbox environments where MITM proxy certificates are expected
-- Apply this flag to commands like `deno run`, `deno test`, `deno check`, etc. when they need to fetch remote modules
+- This flag should only be used in sandbox environments where MITM proxy
+  certificates are expected
+- Apply this flag to commands like `deno run`, `deno test`, `deno check`, etc.
+  when they need to fetch remote modules
 
 Example usage:
 
@@ -133,4 +143,5 @@ deno test --unsafely-ignore-certificate-errors
 deno check --unsafely-ignore-certificate-errors src/
 ```
 
-**Note**: This flag should only be used in trusted sandbox environments and never in production code.
+**Note**: This flag should only be used in trusted sandbox environments and
+never in production code.

@@ -18,5 +18,7 @@ export type {
   User,
 } from "https://lib.deno.dev/x/grammy@v1/types.ts";
 
+export { nanoid } from "npm:nanoid@^4.0.2";
+
 export { afterEach, beforeEach, describe, it } from "jsr:@std/testing/bdd";
 export { expect } from "jsr:@std/expect";

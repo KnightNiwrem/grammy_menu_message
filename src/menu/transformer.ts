@@ -109,6 +109,8 @@ async function handleApiCall<C extends Context, TStored>(
     payload: entry.payload,
     path: entry.path,
     timestamp,
+    renderId: entry.renderId,
+    buttons: entry.buttons.map((button) => ({ ...button })),
   };
 
   if (entry.kind === "edit" && session.history.length > 0) {
@@ -117,12 +119,18 @@ async function handleApiCall<C extends Context, TStored>(
     session.history.push(historyEntry);
   }
 
-  if (session.active && session.active.menuId === entry.menuId) {
+  if (
+    session.active &&
+    session.active.menuId === entry.menuId &&
+    session.active.renderId === entry.renderId
+  ) {
     session.active = {
       ...session.active,
       messageId,
       payload: entry.payload,
       timestamp,
+      renderId: entry.renderId,
+      buttons: entry.buttons.map((button) => ({ ...button })),
     };
   }
 

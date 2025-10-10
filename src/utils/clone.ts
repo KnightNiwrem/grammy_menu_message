@@ -8,6 +8,7 @@ export function cloneHistory(
     keyboard: entry.keyboard
       ? entry.keyboard.map((row) => row.map((button) => ({ ...button })))
       : undefined,
+    buttons: entry.buttons.map((button) => ({ ...button })),
   }));
 }
 
@@ -17,6 +18,7 @@ export function cloneSession(session: MenuSession): MenuSession {
       ? {
         ...session.active,
         path: [...session.active.path],
+        buttons: session.active.buttons.map((button) => ({ ...button })),
       }
       : undefined,
     history: cloneHistory(session.history),

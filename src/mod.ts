@@ -1,4 +1,4 @@
-import { Composer } from "../deps.deno.ts";
+import { Composer, nanoid } from "../deps.deno.ts";
 import type { Api, Context, RawApi } from "../deps.deno.ts";
 
 import { MenuStorage } from "./storage/menu_storage.ts";
@@ -9,12 +9,15 @@ import {
   parseActionData,
   toReplyMarkup,
 } from "./menu/renderer.ts";
+import type { ParsedActionData } from "./menu/renderer.ts";
 import {
   queuePendingMessage,
   registerMenuTransformer,
 } from "./menu/transformer.ts";
 import {
   type CreateMenuMessagePluginOptions,
+  type MenuActionPayload,
+  type MenuButtonState,
   type MenuContext,
   type MenuDefinition,
   type MenuHistoryEntry,
@@ -61,54 +64,83 @@ export function createMenuMessagePlugin<
     const { key, session } = await storage.read(baseCtx as unknown as C);
     let currentKey = key;
     let currentSession = session;
+    let currentRenderContext: RenderContext | undefined;
 
     const controller: MenuMessageController<C> = {
       show: async (menuId, payload, showOptions) => {
         const menu = ensureMenuDefinition(registry, menuId);
-        const result = await storage.withSession(
-          baseCtx as unknown as C,
-          (draft) => {
-            const previousActive = draft.active;
-            const nextState = createMenuState(
-              menuId,
-              payload,
-              previousActive,
-              showOptions,
-              clock,
-            );
-            if (showOptions?.stack === false && draft.history.length > 0) {
-              draft.history.pop();
+        const renderId = nanoid();
+        const context: RenderContext = {
+          menuId,
+          renderId,
+          buttons: [],
+        };
+        const previousContext = currentRenderContext;
+        currentRenderContext = context;
+
+        try {
+          const result = await storage.withSession(
+            baseCtx as unknown as C,
+            (draft) => {
+              const previousActive = draft.active;
+              const nextState = createMenuState(
+                menuId,
+                payload,
+                previousActive,
+                showOptions,
+                clock,
+                renderId,
+              );
+              if (showOptions?.stack === false && draft.history.length > 0) {
+                draft.history.pop();
+              }
+              draft.active = nextState;
+              return { previousActive };
+            },
+          );
+
+          currentKey = result.key;
+          currentSession = result.session;
+
+          const previousActive = result.result.previousActive;
+          if (previousActive && previousActive.menuId !== menuId) {
+            const previousMenu = registry.get(previousActive.menuId);
+            if (previousMenu?.onLeave) {
+              await previousMenu.onLeave(baseCtx, currentSession);
             }
-            draft.active = nextState;
-            return { previousActive };
-          },
-        );
-
-        currentKey = result.key;
-        currentSession = result.session;
-
-        const previousActive = result.result.previousActive;
-        if (previousActive && previousActive.menuId !== menuId) {
-          const previousMenu = registry.get(previousActive.menuId);
-          if (previousMenu?.onLeave) {
-            await previousMenu.onLeave(baseCtx, currentSession);
           }
-        }
-        if (previousActive?.menuId !== menuId && menu.onEnter) {
-          await menu.onEnter(baseCtx, currentSession);
-        }
+          if (previousActive?.menuId !== menuId && menu.onEnter) {
+            await menu.onEnter(baseCtx, currentSession);
+          }
 
-        const render = await menu.render(
-          baseCtx,
-          currentSession.active!,
-          currentSession,
-        );
-        return render;
+          const render = await menu.render(
+            baseCtx,
+            currentSession.active!,
+            currentSession,
+          );
+
+          if (currentSession.active) {
+            const buttons = context.buttons.map((button) => ({ ...button }));
+            currentSession.active = {
+              ...currentSession.active,
+              buttons,
+            };
+            await storage.write(currentKey, currentSession);
+          }
+
+          return render;
+        } finally {
+          currentRenderContext = previousContext;
+        }
       },
       reply: async (menuId, payload, replyOptions) => {
         const render = await controller.show(menuId, payload);
         const keyboard = normalizeKeyboard(render.keyboard);
         const chatId = ensureChatId(baseCtx);
+        const activeState = currentSession.active;
+        if (!activeState) {
+          throw new Error("menuMessage.reply requires an active menu state");
+        }
         queuePendingMessage(
           baseCtx.api,
           createPendingEntry({
@@ -119,8 +151,10 @@ export function createMenuMessagePlugin<
             text: render.text,
             keyboard,
             payload,
-            path: currentSession.active?.path ?? [menuId],
+            path: activeState.path,
             options: replyOptions,
+            renderId: activeState.renderId,
+            buttons: activeState.buttons,
           }),
         );
         const response = await baseCtx.api.sendMessage(
@@ -144,8 +178,13 @@ export function createMenuMessagePlugin<
           ...rest
         } = editOptions ?? {};
         const chatId = overrideChatId ?? baseCtx.chat?.id;
-        const messageId = overrideMessageId ?? currentSession.active?.messageId;
-        if (chatId === undefined || messageId === undefined) {
+        const activeState = currentSession.active;
+        const messageId = overrideMessageId ?? activeState?.messageId;
+        if (
+          chatId === undefined ||
+          messageId === undefined ||
+          !activeState
+        ) {
           throw new Error(
             "menuMessage.edit requires a known message id and chat id",
           );
@@ -160,9 +199,11 @@ export function createMenuMessagePlugin<
             text: render.text,
             keyboard,
             payload,
-            path: currentSession.active?.path ?? [menuId],
+            path: activeState.path,
             options: rest,
             messageId,
+            renderId: activeState.renderId,
+            buttons: activeState.buttons,
           }),
         );
         const result = await baseCtx.api.editMessageText(
@@ -179,6 +220,7 @@ export function createMenuMessagePlugin<
         return result;
       },
       back: async (showOptions) => {
+        const renderId = nanoid();
         const outcome = await storage.withSession(
           baseCtx as unknown as C,
           (draft) => {
@@ -200,6 +242,8 @@ export function createMenuMessagePlugin<
                 : [...targetHistory.path],
               messageId: targetHistory.messageId,
               timestamp: clock(),
+              renderId,
+              buttons: [] as MenuButtonState[],
             };
             return { target: targetHistory };
           },
@@ -211,12 +255,33 @@ export function createMenuMessagePlugin<
           return undefined;
         }
         const menu = ensureMenuDefinition(registry, target.menuId);
-        const render = await menu.render(
-          baseCtx,
-          currentSession.active!,
-          currentSession,
-        );
-        return render;
+        const context: RenderContext = {
+          menuId: target.menuId,
+          renderId,
+          buttons: [],
+        };
+        const previousContext = currentRenderContext;
+        currentRenderContext = context;
+        try {
+          const render = await menu.render(
+            baseCtx,
+            currentSession.active!,
+            currentSession,
+          );
+
+          if (currentSession.active) {
+            const buttons = context.buttons.map((button) => ({ ...button }));
+            currentSession.active = {
+              ...currentSession.active,
+              buttons,
+            };
+            await storage.write(currentKey, currentSession);
+          }
+
+          return render;
+        } finally {
+          currentRenderContext = previousContext;
+        }
       },
       clear: async () => {
         await storage.clear(baseCtx as unknown as C);
@@ -224,9 +289,32 @@ export function createMenuMessagePlugin<
       },
       current: () => currentSession.active,
       history: () => currentSession.history.slice(),
-      buildActionData: (menuId, action, data) =>
-        buildActionData(menuId, action, data, namespace),
-      parseActionData: (raw) => parseActionData(raw, namespace),
+      buildActionData: (menuId, action, data) => {
+        if (!currentRenderContext) {
+          throw new Error(
+            "menuMessage.buildActionData can only be used while rendering a menu",
+          );
+        }
+        const buttonId = nanoid();
+        const button: MenuButtonState = { id: buttonId, menuId, action };
+        if (data !== undefined) {
+          button.data = data;
+        }
+        currentRenderContext.buttons.push(button);
+        return buildActionData(
+          currentRenderContext.menuId,
+          currentRenderContext.renderId,
+          buttonId,
+          namespace,
+        );
+      },
+      parseActionData: (raw) => {
+        const parsed = parseActionData(raw, namespace);
+        if (!parsed) {
+          return undefined;
+        }
+        return resolveActionPayload(currentSession, parsed);
+      },
     };
 
     baseCtx.menuMessage = controller;
@@ -239,11 +327,11 @@ export function createMenuMessagePlugin<
     if (!payload) {
       return await next();
     }
-    const action = parseActionData(payload, namespace);
+    const baseCtx = ctx as MenuContext<C>;
+    const action = baseCtx.menuMessage.parseActionData(payload);
     if (!action) {
       return await next();
     }
-    const baseCtx = ctx as MenuContext<C>;
     const definition = registry.get(action.menuId) ??
       (baseCtx.menuMessage.current()?.menuId
         ? registry.get(baseCtx.menuMessage.current()!.menuId)
@@ -338,6 +426,7 @@ function createMenuState(
   previous: MenuState | undefined,
   options: MenuShowOptions | undefined,
   clock: () => number,
+  renderId: string,
 ): MenuState {
   const path = resolvePath(previous, menuId, options);
   return {
@@ -346,6 +435,8 @@ function createMenuState(
     path,
     messageId: previous?.messageId,
     timestamp: clock(),
+    renderId,
+    buttons: [] as MenuButtonState[],
   };
 }
 
@@ -383,6 +474,8 @@ interface PendingEntryParams {
   path: ReadonlyArray<string>;
   options?: Record<string, unknown>;
   messageId?: number;
+  renderId: string;
+  buttons: ReadonlyArray<MenuButtonState>;
 }
 
 function createPendingEntry(params: PendingEntryParams): PendingMenuMessage {
@@ -394,8 +487,62 @@ function createPendingEntry(params: PendingEntryParams): PendingMenuMessage {
     text: params.text,
     keyboard: params.keyboard,
     payload: params.payload,
-    path: params.path,
+    path: [...params.path],
     options: params.options,
     messageId: params.messageId,
+    renderId: params.renderId,
+    buttons: params.buttons.map((button) => ({ ...button })),
   };
+}
+
+function resolveActionPayload(
+  session: MenuSession,
+  parsed: ParsedActionData,
+): MenuActionPayload | undefined {
+  const activeMatch = matchButtonState(session.active, parsed);
+  if (activeMatch) {
+    return activeMatch;
+  }
+  for (let index = session.history.length - 1; index >= 0; index -= 1) {
+    const entry = session.history[index];
+    const match = matchButtonState(entry, parsed);
+    if (match) {
+      return match;
+    }
+  }
+  return undefined;
+}
+
+function matchButtonState(
+  candidate: MenuState | MenuHistoryEntry | undefined,
+  parsed: ParsedActionData,
+): MenuActionPayload | undefined {
+  if (!candidate) {
+    return undefined;
+  }
+  if (
+    candidate.menuId !== parsed.menuId || candidate.renderId !== parsed.renderId
+  ) {
+    return undefined;
+  }
+  const button = candidate.buttons.find((entry) =>
+    entry.id === parsed.buttonId
+  );
+  if (!button) {
+    return undefined;
+  }
+  return {
+    menuId: button.menuId,
+    sourceMenuId: parsed.menuId,
+    renderId: parsed.renderId,
+    buttonId: parsed.buttonId,
+    action: button.action,
+    data: button.data,
+  };
+}
+
+interface RenderContext {
+  menuId: string;
+  renderId: string;
+  buttons: MenuButtonState[];
 }

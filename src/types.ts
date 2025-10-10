@@ -20,7 +20,19 @@ export interface MenuRenderResult {
   payload?: unknown;
 }
 
-export interface MenuHistoryEntry {
+export interface MenuButtonState {
+  id: string;
+  menuId: string;
+  action: string;
+  data?: string;
+}
+
+export interface MenuRenderMetadata {
+  renderId: string;
+  buttons: ReadonlyArray<MenuButtonState>;
+}
+
+export interface MenuHistoryEntry extends MenuRenderMetadata {
   menuId: string;
   messageId?: number;
   text: string;
@@ -30,7 +42,7 @@ export interface MenuHistoryEntry {
   timestamp: number;
 }
 
-export interface MenuState {
+export interface MenuState extends MenuRenderMetadata {
   menuId: string;
   payload?: unknown;
   path: ReadonlyArray<string>;
@@ -45,6 +57,9 @@ export interface MenuSession {
 
 export interface MenuActionPayload {
   menuId: string;
+  sourceMenuId: string;
+  renderId: string;
+  buttonId: string;
   action: string;
   data?: string;
 }
@@ -184,4 +199,6 @@ export interface PendingMenuMessage {
   options?: MenuReplyOptions;
   messageId?: number;
   path: ReadonlyArray<string>;
+  renderId: string;
+  buttons: ReadonlyArray<MenuButtonState>;
 }

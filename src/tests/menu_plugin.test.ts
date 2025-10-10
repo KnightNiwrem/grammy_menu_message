@@ -3,11 +3,13 @@ import { expect } from "../../deps.deno.ts";
 
 import { createMenuMessagePlugin } from "../mod.ts";
 import type {
+  MenuActionPayload,
   MenuContext,
   MenuDefinition,
   MenuMessagePlugin,
   MenuSession,
 } from "../types.ts";
+import { buildActionData, DEFAULT_NAMESPACE } from "../menu/renderer.ts";
 import type {
   Api,
   CallbackQuery,
@@ -153,10 +155,12 @@ describe("menuMessage plugin", () => {
     next: () => Promise<void>,
   ) => Promise<void>;
   let menu: MenuDefinition<Context>;
+  let capturedAction: MenuActionPayload | undefined;
 
   beforeEach(() => {
     storage = new MockStorageAdapter();
     api = new MockApi();
+    capturedAction = undefined;
 
     menu = {
       id: "main",
@@ -167,7 +171,8 @@ describe("menuMessage plugin", () => {
           callback_data: ctx.menuMessage.buildActionData("main", "open"),
         }]],
       }),
-      onAction: async (ctx) => {
+      onAction: async (ctx, payload) => {
+        capturedAction = payload;
         await ctx.menuMessage.show("main", "action");
       },
     } satisfies MenuDefinition<Context>;
@@ -198,8 +203,17 @@ describe("menuMessage plugin", () => {
     const session = storage.data.get(key);
     expect(session).toBeDefined();
     expect(session?.history.length).toBe(1);
-    expect(session?.history[0].text).toBe("menu:root");
-    expect(ctx.menuMessage.current()?.messageId).toBe(1);
+    const entry = session?.history[0];
+    expect(entry?.text).toBe("menu:root");
+    expect(typeof entry?.renderId).toBe("string");
+    expect(entry?.buttons.length).toBe(1);
+    expect(entry?.buttons[0].action).toBe("open");
+    expect(typeof entry?.buttons[0].id).toBe("string");
+    expect(entry?.buttons[0].menuId).toBe("main");
+    const current = ctx.menuMessage.current();
+    expect(current?.messageId).toBe(1);
+    expect(current?.renderId).toBe(entry?.renderId);
+    expect(current?.buttons.length).toBe(1);
   });
 
   it("updates history on edit", async () => {
@@ -207,12 +221,20 @@ describe("menuMessage plugin", () => {
     await middleware(ctx, async () => {});
 
     await ctx.menuMessage.reply("main", "root");
+    const key = `${ctx.chat.id}:10:${ctx.from.id}`;
+    const sessionAfterReply = storage.data.get(key)!;
+    const initialRenderId = sessionAfterReply.history[0].renderId;
+    const initialButtonId = sessionAfterReply.history[0].buttons[0].id;
     await ctx.menuMessage.edit("main", "updated");
 
-    const key = `${ctx.chat.id}:10:${ctx.from.id}`;
     const session = storage.data.get(key)!;
     expect(session.history.length).toBe(1);
     expect(session.history[0].text).toBe("menu:updated");
+    expect(session.history[0].renderId).not.toBe(initialRenderId);
+    expect(session.history[0].buttons.length).toBe(1);
+    expect(session.history[0].buttons[0].action).toBe("open");
+    expect(session.history[0].buttons[0].id).not.toBe(initialButtonId);
+    expect(session.history[0].buttons[0].menuId).toBe("main");
   });
 
   it("invokes onAction for menu callbacks", async () => {
@@ -221,8 +243,19 @@ describe("menuMessage plugin", () => {
 
     await ctx.menuMessage.reply("main", "root");
 
+    const key = `${ctx.chat.id}:10:${ctx.from.id}`;
+    const entry = storage.data.get(key)!.history[0];
+    const buttonId = entry.buttons[0].id;
+    const renderId = entry.renderId;
+    const callbackData = buildActionData(
+      entry.menuId,
+      renderId,
+      buttonId,
+      DEFAULT_NAMESPACE,
+    );
+
     ctx.callbackQuery = {
-      data: ctx.menuMessage.buildActionData("main", "open"),
+      data: callbackData,
       message: { message_thread_id: 10 },
     } as unknown as CallbackQuery;
     Object.assign(ctx.update as unknown as Record<string, unknown>, {
@@ -230,9 +263,13 @@ describe("menuMessage plugin", () => {
     });
 
     await middleware(ctx, async () => {});
-
-    const key = `${ctx.chat.id}:10:${ctx.from.id}`;
     const session = storage.data.get(key)!;
     expect(session.active?.payload).toBe("action");
+    expect(capturedAction).toBeDefined();
+    expect(capturedAction?.menuId).toBe("main");
+    expect(capturedAction?.sourceMenuId).toBe("main");
+    expect(capturedAction?.action).toBe("open");
+    expect(capturedAction?.renderId).toBe(renderId);
+    expect(capturedAction?.buttonId).toBe(buttonId);
   });
 });

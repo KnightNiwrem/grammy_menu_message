@@ -3,14 +3,16 @@ import type {
   InlineKeyboardButton,
   InlineKeyboardMarkup,
 } from "../../deps.deno.ts";
-import type {
-  InlineKeyboardMatrix,
-  MenuActionPayload,
-  MenuRenderResult,
-} from "../types.ts";
+import type { InlineKeyboardMatrix, MenuRenderResult } from "../types.ts";
 
 export const DEFAULT_NAMESPACE = "mm" as const;
 const ACTION_SEPARATOR = ":";
+
+export interface ParsedActionData {
+  menuId: string;
+  renderId: string;
+  buttonId: string;
+}
 
 export function normalizeKeyboard(
   keyboard?: MenuRenderResult["keyboard"],
@@ -28,14 +30,11 @@ export function normalizeKeyboard(
 
 export function buildActionData(
   menuId: string,
-  action: string,
-  data?: string,
+  renderId: string,
+  buttonId: string,
   namespace: string = DEFAULT_NAMESPACE,
 ): string {
-  const segments = [namespace, menuId, action];
-  if (data !== undefined) {
-    segments.push(data);
-  }
+  const segments = [namespace, menuId, renderId, buttonId];
   return segments.map((value) => encodeURIComponent(String(value))).join(
     ACTION_SEPARATOR,
   );
@@ -44,21 +43,21 @@ export function buildActionData(
 export function parseActionData(
   raw: string,
   namespace: string = DEFAULT_NAMESPACE,
-): MenuActionPayload | undefined {
+): ParsedActionData | undefined {
   if (!raw.startsWith(namespace + ACTION_SEPARATOR)) {
     return undefined;
   }
   const segments = raw.split(ACTION_SEPARATOR).map((segment) =>
     decodeURIComponent(segment)
   );
-  if (segments.length < 3) {
+  if (segments.length < 4) {
     return undefined;
   }
-  const [, menuId, action, data] = segments;
+  const [, menuId, renderId, buttonId] = segments;
   return {
     menuId,
-    action,
-    data,
+    renderId,
+    buttonId,
   };
 }
 
